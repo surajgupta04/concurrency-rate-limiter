@@ -1,626 +1,74 @@
-live demo : https://concurrency-rate-limiter.onrender.com/
+
+# Concurrent Rate Limiter & Request Queue
+
+A small Node.js backend that protects a server from traffic bursts using a token bucket rate limiter, a FIFO queue, and a worker pool — with a live dashboard so you can actually watch it happen instead of reading numbers in a terminal.
+
+**Live demo:** https://concurrency-rate-limiter.onrender.com/
+(Hosted on Render's free tier, so the first request after a period of inactivity can take 30-50s to wake up — give it a moment.)
 
 <img width="1500" height="732" alt="image" src="https://github.com/user-attachments/assets/a887636b-ac99-42c8-8c09-46cc88cfde5a" />
 <img width="1232" height="967" alt="image" src="https://github.com/user-attachments/assets/f95275de-3926-4b80-9e16-5b743ec16cc3" />
 
+## Why I built this
 
+This is the pattern companies like Stripe and Cloudflare use to stop traffic spikes from taking down a service: don't reject excess requests, queue them and process what you can handle, when you can handle it. I wanted to build it from scratch instead of just dropping in `express-rate-limit`, to actually understand what's happening under the hood — token refill timing, queue backpressure, and how a worker pool processes jobs concurrently without blocking Node's event loop.
 
-# Concurrent Rate Limiter & Request Queue Service
+## How it works
 
-A backend system built using Node.js that demonstrates:
+- **Token bucket** — the bucket holds a fixed number of tokens (10) and refills once per second. Every request consumes a token. If the bucket is empty, the request goes to the queue instead of being dropped.
+- **FIFO queue** — requests that couldn't get a token wait here, in arrival order, until a worker picks them up.
+- **Worker pool** — 4 workers pull jobs off the queue and process them concurrently, instead of one request blocking the next.
+- **Dashboard** — polls `/api/metrics` and renders queue size, active workers, throughput, and a live activity log.
 
-- Rate Limiting using Token Bucket Algorithm
-- FIFO Request Queue
-- Worker Pool Architecture
-- Concurrent Request Processing
-- Real-Time Monitoring Dashboard
-- System Metrics Collection
-- Activity Logging
+```
+Incoming requests → Token bucket → FIFO queue (if no token) → Worker pool → Metrics
+```
 
----
+## Tech stack
 
-# Project Overview
+- Node.js, Express
+- Worker Threads (`worker_threads`) for the worker pool
+- Vanilla HTML/CSS/JS for the dashboard — no frontend framework
 
-In real-world systems, thousands of requests may hit a server at the same time.
+## Running it locally
 
-If all requests are processed immediately:
+```bash
+git clone https://github.com/surajgupta04/concurrency-rate-limiter.git
+cd concurrency-rate-limiter
+npm install
+node server.js
+```
 
-- CPU can become overloaded
-- Memory usage can increase rapidly
-- APIs may crash
-- User experience degrades
+Then open `http://localhost:3000` (or whatever port is logged on start).
 
-To solve this problem, companies like Google, Amazon, Netflix, and Uber use:
+## API
 
-1. Rate Limiting
-2. Request Queues
-3. Worker Pools
+| Method | Endpoint | Description |
+|---|---|---|
+| POST | `/api/request` | Submit a request to the limiter/queue |
+| GET | `/api/metrics` | Current metrics snapshot (queue size, tokens, workers, throughput) |
+| POST | `/api/reset` | Reset all dashboard stats |
 
-This project demonstrates these concepts in a simplified way.
+## Load testing
 
----
+`loadTest.js` fires a burst of requests against the running server so you can watch the queue fill and drain on the dashboard in real time. Run it with the server already running:
 
-# Architecture
+```bash
+node loadTest.js
+```
 
-Incoming Requests
+## Known limitations
 
-↓
+- **Single instance only.** The token bucket and queue live in process memory, so this only works correctly behind one server instance. Running multiple instances behind a load balancer would let each instance hand out its own full set of tokens — the limiter would no longer be enforcing a real global limit.
+- **Worker threads are doing simulated work**, not real CPU-bound processing. For genuinely I/O-bound request handling, Node's event loop already handles concurrency without extra threads — worker threads earn their place once there's actual CPU-heavy work (image/video processing, batch analytics, etc.) to take off the main thread.
+- State resets on restart — nothing is persisted.
 
-Token Bucket Rate Limiter
+## What I'd build next
 
-↓
+- Move the token bucket into Redis (`INCR`/`EXPIRE` or a Lua script) so the limit holds across multiple server instances instead of resetting per-process
+- Containerize with Docker so it's a one-command spin-up
+- Per-client rate limiting (currently the limiter is global, not per-user/IP)
 
-FIFO Queue
+## Author
 
-↓
-
-Worker Pool
-
-↓
-
-Processed Request
-
-↓
-
-Metrics Dashboard
-
----
-
-# Technologies Used
-
-## Backend
-
-- Node.js
-- Express.js
-- Worker Threads
-
-## Frontend
-
-- HTML
-- CSS
-- JavaScript
-
-## Concepts
-
-- Concurrency
-- Worker Threads
-- Queue Data Structure
-- Token Bucket Algorithm
-- System Monitoring
-- Real-Time Metrics
-
----
-
-# Folder Structure
-
-rate-limiter-service/
-
-├── server.js
-
-├── queue.js
-
-├── rateLimiter.js
-
-├── worker.js
-
-├── metrics.js
-
-├── package.json
-
-├── public/
-
-│ ├── index.html
-
-│ ├── style.css
-
-│ └── script.js
-
-└── README.md
-
----
-
-# Core Concepts
-
-# 1. Rate Limiting
-
-Rate Limiting controls how many requests are allowed during a time window.
-
-Example:
-
-Server allows:
-
-10 requests per second
-
-If 100 requests arrive:
-
-First 10:
-
-Accepted
-
-Remaining:
-
-Queued
-
-Benefits:
-
-- Prevents server overload
-- Prevents abuse
-- Improves stability
-
----
-
-# 2. Token Bucket Algorithm
-
-This project uses the Token Bucket Algorithm.
-
-Imagine a bucket containing tokens.
-
-Bucket Capacity = 10
-
-Every request consumes:
-
-1 token
-
-If token exists:
-
-Request accepted
-
-If token does not exist:
-
-Request queued
-
-Tokens refill automatically every second.
-
-Example:
-
-Initial:
-
-Tokens = 10
-
-10 Requests arrive
-
-Tokens become:
-
-0
-
-11th Request arrives
-
-No token available
-
-Request enters queue
-
-After refill:
-
-Tokens = 10
-
-Queue starts processing again
-
----
-
-# 3. FIFO Queue
-
-FIFO:
-
-First In First Out
-
-Example:
-
-Request A
-
-Request B
-
-Request C
-
-Processing Order:
-
-A
-
-B
-
-C
-
-Why?
-
-Fair processing.
-
-No request jumps ahead.
-
----
-
-# Queue Operations
-
-enqueue()
-
-Adds request.
-
-dequeue()
-
-Removes oldest request.
-
-peek()
-
-Returns first request.
-
-size()
-
-Current queue size.
-
-isEmpty()
-
-Checks queue status.
-
----
-
-# 4. Worker Pool
-
-Worker Pool = Group of workers processing jobs simultaneously.
-
-In this project:
-
-4 Workers
-
-Worker 1
-
-Worker 2
-
-Worker 3
-
-Worker 4
-
-Instead of processing:
-
-100 requests one-by-one
-
-Workers process multiple requests concurrently.
-
-Benefits:
-
-- Better throughput
-- Better scalability
-- Faster processing
-
----
-
-# Why Worker Threads?
-
-Node.js is single-threaded.
-
-Heavy CPU tasks can block the event loop.
-
-Worker Threads allow:
-
-Parallel execution
-
-without blocking the main server.
-
-Real companies use similar architectures for:
-
-- Image processing
-- Video processing
-- Background jobs
-- Analytics systems
-
----
-
-# Concurrency vs Parallelism
-
-Concurrency:
-
-Multiple tasks make progress together.
-
-Example:
-
-Handling many requests.
-
-Parallelism:
-
-Multiple tasks run at the same time.
-
-Example:
-
-Worker Threads running simultaneously.
-
-This project demonstrates both.
-
----
-
-# Request Flow
-
-Step 1
-
-User clicks:
-
-Send 100 Requests
-
-↓
-
-Step 2
-
-Requests reach server
-
-↓
-
-Step 3
-
-Token Bucket checks available tokens
-
-↓
-
-Step 4
-
-Requests accepted or queued
-
-↓
-
-Step 5
-
-Worker Pool picks queued jobs
-
-↓
-
-Step 6
-
-Workers process requests
-
-↓
-
-Step 7
-
-Metrics updated
-
-↓
-
-Step 8
-
-Dashboard refreshes
-
----
-
-# Metrics Collected
-
-## Processed Requests
-
-Total completed jobs.
-
----
-
-## Queued Requests
-
-Total requests placed in queue.
-
----
-
-## Queue Size
-
-Current queue length.
-
----
-
-## Max Queue Size
-
-Largest queue observed.
-
----
-
-## Average Wait Time
-
-Average time spent waiting before processing.
-
-Formula:
-
-Average Wait Time
-
-=
-
-Total Wait Time
-
-/
-
-Processed Requests
-
----
-
-## Active Workers
-
-Workers currently processing jobs.
-
----
-
-## Total Workers
-
-Maximum worker count.
-
----
-
-## Requests Per Second
-
-Throughput of the system.
-
-Measures processing speed.
-
----
-
-# Dashboard Features
-
-Real-time metrics
-
-Request simulator
-
-Worker status monitor
-
-Activity logs
-
-Reset dashboard
-
-Traffic visualization
-
-Dark professional UI
-
----
-
-# API Endpoints
-
-## Send Request
-
-POST
-
-/api/request
-
-Creates a new request.
-
----
-
-## Metrics
-
-GET
-
-/api/metrics
-
-Returns:
-
-- Processed Requests
-- Queue Size
-- Workers
-- Tokens
-- Logs
-
----
-
-## Reset Metrics
-
-POST
-
-/api/reset
-
-Resets dashboard statistics.
-
----
-
-# Example Scenario
-
-User sends:
-
-100 requests
-
-Token Bucket:
-
-10 tokens
-
-Result:
-
-10 accepted immediately
-
-90 queued
-
-Workers:
-
-4
-
-Workers start processing requests.
-
-Queue gradually decreases.
-
-Dashboard updates in real-time.
-
----
-
-# What Interviewers Can Ask
-
-## Why Rate Limiting?
-
-Protects services from overload.
-
----
-
-## Why Queue?
-
-Stores excess requests safely.
-
----
-
-## Why FIFO?
-
-Fair request ordering.
-
----
-
-## Why Worker Pool?
-
-Improves throughput and concurrency.
-
----
-
-## Why Worker Threads?
-
-Provides parallel execution without blocking Node.js event loop.
-
----
-
-## Difference Between Async and Worker Threads?
-
-Async:
-
-Good for I/O operations.
-
-Worker Threads:
-
-Good for parallel CPU or background processing.
-
----
-
-## What Would You Improve?
-
-- Redis Queue
-- Distributed Rate Limiter
-- RabbitMQ Integration
-- Kafka Integration
-- Docker Deployment
-- Kubernetes Scaling
-- Authentication
-- Request Prioritization
-
----
-
-# Resume Description
-
-Concurrent Rate Limiter & Request Queue Service
-
-- Built a concurrent request processing system using Node.js, Express, Worker Threads, and Token Bucket Rate Limiting.
-- Implemented FIFO request queue to handle traffic bursts and prevent request loss.
-- Designed a worker pool architecture with 4 concurrent workers for parallel request processing.
-- Developed a real-time monitoring dashboard displaying throughput, queue size, active workers, token availability, and processing metrics.
-- Added request logging, queue analytics, average wait time tracking, and system monitoring features.
-
----
-
-# Learning Outcomes
-
-After completing this project:
-
-✓ Understand Rate Limiting
-
-✓ Understand Token Bucket Algorithm
-
-✓ Understand FIFO Queues
-
-✓ Understand Worker Pools
-
-✓ Understand Worker Threads
-
-✓ Understand Concurrency
-
-✓ Understand Parallel Processing
-
-✓ Understand System Monitoring
-
-✓ Understand Backend System Design
-
-✓ Understand Real-World Traffic Management
-
----
-
-# Author
-
-Suraj Gupta
-
-Backend Developer | MERN Stack | DSA Enthusiast
+Suraj Gupta — backend development, MERN stack
