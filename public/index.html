@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>
+        Concurrent Rate Limiter Dashboard
+    </title>
+
+    <link
+        rel="stylesheet"
+        href="style.css"
+    >
+
+</head>
+
+<body>
+
+    <div class="container">
+
+        <!-- HEADER -->
+
+        <header class="header">
+
+            <div>
+
+                <h1>
+                    Concurrent Rate Limiter
+                </h1>
+
+                <p>
+                    Real-Time Queue & Worker Monitoring Dashboard
+                </p>
+
+            </div>
+
+            <div class="status-badge">
+                System Active
+            </div>
+
+        </header>
+
+        <!-- METRICS -->
+
+        <section class="metrics-grid">
+
+            <div class="card">
+                <h3>Processed Requests</h3>
+                <h2 id="processedRequests">0</h2>
+            </div>
+
+            <div class="card">
+                <h3>Total Queued Requests</h3>
+                <h2 id="queuedRequests">0</h2>
+            </div>
+
+            <div class="card">
+                <h3>Available Tokens</h3>
+                <h2 id="availableTokens">0</h2>
+            </div>
+
+            <div class="card">
+                <h3>Current Queue Size</h3>
+                <h2 id="queueSize">0</h2>
+            </div>
+
+            <div class="card">
+                <h3>Average Wait Time</h3>
+                <h2 id="averageWaitTime">
+                    0 ms
+                </h2>
+            </div>
+
+            <div class="card">
+                <h3>Max Queue Size</h3>
+                <h2 id="maxQueueSize">0</h2>
+            </div>
+
+            <div class="card">
+                <h3>Requests / Sec</h3>
+                <h2 id="requestsPerSecond">
+                    0
+                </h2>
+            </div>
+
+            <div class="card">
+                <h3>Active Workers</h3>
+                <h2 id="activeWorkers">0</h2>
+            </div>
+
+            <div class="card">
+                <h3>Total Workers</h3>
+                <h2 id="totalWorkers">0</h2>
+            </div>
+
+        </section>
+
+        <!-- CONTROLS -->
+
+        <section class="controls">
+
+            <h2>
+                Request Simulator
+            </h2>
+
+            <div class="button-group">
+
+                <button id="sendOne">
+                    Send 1 Request
+                </button>
+
+                <button id="sendHundred">
+                    Send 100 Requests
+                </button>
+
+                <button id="sendThousand">
+                    Send 1000 Requests
+                </button>
+
+                <button id="resetDashboard">
+                    Reset Dashboard
+                </button>
+
+            </div>
+
+        </section>
+
+        <!-- WORKER STATUS -->
+
+        <section class="logs">
+
+            <div class="logs-header">
+
+                <h2>
+                    Worker Status
+                </h2>
+
+            </div>
+
+            <div
+                id="workerStatusContainer"
+            >
+
+                <div class="log-item">
+                    Waiting for workers...
+                </div>
+
+            </div>
+
+        </section>
+
+        <!-- ACTIVITY LOGS -->
+
+        <section class="logs">
+
+            <div class="logs-header">
+
+                <h2>
+                    Activity Logs
+                </h2>
+
+            </div>
+
+            <div id="logContainer">
+
+                <div class="log-item">
+                    Waiting for activity...
+                </div>
+
+            </div>
+
+        </section>
+
+    </div>
+
+    <script src="script.js"></script>
+
+</body>
+
+</html>
